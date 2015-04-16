@@ -1,0 +1,168 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  Server.h
+ *
+ *    Description:  
+ *
+ *        Version:  1.0
+ *        Created:  2015年04月16日 18时44分28秒
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:   (wangweihao), 578867817@qq.com
+ *        Company:  xiyoulinuxgroup
+ *
+ * =====================================================================================
+ */
+
+#ifndef _SERVER_H_
+#define _SERVER_H_
+
+enum { Max_conn = 10000 };
+
+#include "Acceptor.h"
+#include <sys/epoll.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+#include <vector>
+#include <string>
+#include <map>
+
+class Server
+{
+    public:
+        Server(int pt, std::string &ht):
+            port(pt), host(ht)
+            {
+                server_addr.sin_family = AF_INET;
+                server_addr.sin_port = htons(port);
+                inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr);
+                int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+                if(sockfd < 0)
+                {
+                    perror("socket error\n");
+                    exit(EXIT_FAILURE);
+                }
+                int ret = bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
+                if(ret == -1)
+                {
+                    perror("binf error\n");
+                    exit(EXIT_FAILURE);
+                }
+                listen_fd = listen(sockfd, 5);
+                if(listen_fd == -1)
+                {
+                    perror("listen error\n");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        ~Server() 
+        {
+            close(listen_fd);
+            close(epollfd); 
+        }
+        /* ready_函数：执行初始化操作 */
+        int ready_();
+        /* run_运行函数 */
+        int run_();
+
+
+    private:
+        /* register_函数：登记新加入的连接事件 */
+        int register_();
+
+    private:
+        int port;
+        std::string host;
+        
+        int listen_fd = 0;
+        int epollfd = 0;
+        std::vector<Acceptor>all_accpet;
+        
+        struct sockaddr_in server_addr;
+        struct epoll_event events[Max_conn];
+};
+
+int
+Server::run_()
+{
+    while(1)
+    {
+        /* 返回已经准备好的事件 */
+        int nfds = epoll_wait(epollfd, events, Max_conn, -1);
+        if(nfds == -1)
+        {
+            perror("epoll_wait error\n");
+            exit(EXIT_FAILURE);
+        }
+        for(int i = 0; i < nfds; ++i)
+        {
+            /* 新加入的连接 */
+            if(events[i].data.fd == listen_fd)
+            {
+                std::cout << "加入连接" << std::endl;
+            }
+            /* 读事件 */
+            else if(events[i].events & EPOLLIN)
+            {
+                std::cout << "读事件" << std::endl;
+            }
+            /* 写事件 */
+            else if(events[i].events & EPOLLOUT)
+            {
+
+            }
+            /* 被挂断 */
+            else if(events[i].events & EPOLLHUP)
+            {
+
+            }
+            /* 错误 */
+            else if(events[i].events & EPOLLERR)
+            {
+
+            }
+        }
+    }
+}
+
+/* 改进时可以设定一个阻塞队列，用epoll新特性批量添加 */
+int 
+Server::register_()
+{
+    struct epoll_event ev;
+    struct sockaddr_in client_addr;
+    
+    ev.events = EPOLLIN | EPOLLOUT;
+    ev.data.fd = listen_fd;
+    socklen_t addrlen = sizeof(struct sockaddr_in);
+
+    int conn_sock = accept4(listen_fd, (struct sockaddr*)&client_addr, &addrlen, SOCK_NONBLOCK);
+    int ret = epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &ev);
+    if(ret == -1)
+    {
+        perror("epoll_ctl error\n");
+        exit(EXIT_FAILURE);
+    }
+
+}
+
+int 
+Server::ready_()
+{
+    epollfd = epoll_create(Max_conn);
+    if(epollfd == -1)
+    {
+        perror("epoll create default\n");
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
+#endif
+
+
