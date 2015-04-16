@@ -19,6 +19,8 @@
 #ifndef _ACCEPTOR_H_
 #define _ACCEPTOR_H_
 
+#define _GUN_SOURCE
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
@@ -41,10 +43,11 @@ class Acceptor final
                     perror("create listen sockfd error\n");
                     exit(EXIT_FAILURE);
                 }
-                struct sockaddr_in server_addr;
+                
                 server_addr.sin_family = AF_INET;
                 server_addr.sin_port = htons(port);
                 inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr);
+                
                 if(bind(listen_sock, (struct sockaddr*)&server_addr, sizeof(sockaddr_in)) < -1)
                 {
                     perror("bind error\n");
@@ -59,19 +62,21 @@ class Acceptor final
             }
         ~Acceptor(){ close(sockfd); }
 
-        int accpet(int flag);
+        int Accpet(int flag);
 
     private:
         int sockfd = 0;
         int port;
         std::string host;
+        struct sockaddr_in server_addr;
 };
 
 int
-Acceptor::accpet(int flag)
+Acceptor::Accpet(int flag)
 {
-    int server_len = sizeof(struct sockaddr_in);
+    socklen_t server_len = sizeof(struct sockaddr_in);
     accept4(sockfd, (struct sockaddr*)&server_addr, &server_len, flag);
+    //accept(sockfd, (struct sockaddr*)&server_addr, &server_len);
 }
 
 #endif
